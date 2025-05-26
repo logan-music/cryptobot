@@ -14,7 +14,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # Coin na target
-SYMBOL = "PEPEUSDT"
+SYMBOL = "1000PEPEUSDT"
 PROFIT_THRESHOLD = Decimal("0.015")  # 1.5%
 initial_price = None
 
