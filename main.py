@@ -2,39 +2,21 @@ import os
 import time
 import requests
 from binance.client import Client
+from binance.exceptions import BinanceAPIException
 from dotenv import load_dotenv
-from flask import Flask
 
-# Load environment variables
-load_dotenv()
-api_key = os.getenv("BINANCE_API_KEY")
-api_secret = os.getenv("BINANCE_SECRET_KEY")
-telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
-telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+# Load API keys from environment variables or hardcoded for now
+api_key = "t99fN1MWcaFytKHwEhec6PuW72Ptf4NpzExyI8c0U2PMaoYL7kDdop7IJPzyxLEb"
+api_secret = "3anCWYwyAQDR5WPaapu8V3pcYYKrdqup0LPQfYGldGClEE0zPiXe7qLrTxhUFeM0"
+telegram_token = "7333244671:AAGih9nJ7Unze9bmdB65odJrnEuSs9adnJw"
+telegram_chat_id = "6978133426"
+
+# Settings
+symbol = "BANANAUSDT"
+take_profit_pct = 0.05  # 5% profit
+check_interval = 300  # 5 minutes
 
 client = Client(api_key, api_secret)
-symbol_to_buy = "BANANAUSDT"
-min_trade_value = 0.001
-
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Logan Bot is alive"
-
-def get_price(symbol):
-    try:
-        ticker = client.get_symbol_ticker(symbol=symbol)
-        return float(ticker["price"])
-    except:
-        return None
-
-def get_balance(asset):
-    try:
-        balance = client.get_asset_balance(asset=asset)
-        return float(balance["free"]) if balance else 0.0
-    except:
-        return 0.0
 
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
@@ -42,51 +24,99 @@ def send_telegram(message):
     try:
         requests.post(url, data=payload)
     except Exception as e:
-        print(f"Telegram error: {e}")
+        print(f"[Telegram Error] {e}")
 
-def sell_all_assets_to_usdt():
+def get_price(symbol):
+    try:
+        ticker = client.get_symbol_ticker(symbol=symbol)
+        return float(ticker["price"])
+    except Exception as e:
+        print(f"[Price Error] {e}")
+        return None
+
+def get_balance(asset):
+    try:
+        balance = client.get_asset_balance(asset=asset)
+        return float(balance["free"]) if balance else 0
+    except Exception as e:
+        print(f"[Balance Error] {e}")
+        return 0
+
+def sell_all_tokens_to_usdt():
     account_info = client.get_account()
-    for asset in account_info["balances"]:
-        free = float(asset["free"])
-        coin = asset["asset"]
-
-        if coin in ["USDT", "BNB"] or free < 0.0001:
+    balances = account_info["balances"]
+    for token in balances:
+        asset = token["asset"]
+        free = float(token["free"])
+        if asset in ["USDT", "BNB"] or free < 0.001:
             continue
+        try:
+            pair = f"{asset}USDT"
+            client.order_market_sell(symbol=pair, quantity=int(free))
+            send_telegram(f"Sold all {free} {asset} to USDT")
+        except BinanceAPIException as e:
+            print(f"[Sell Error] {asset}: {e}")
 
-        symbol = coin + "USDT"
-        price = get_price(symbol)
-        if not price:
-            continue
-
-        total_value = free * price
-        if total_value > min_trade_value:
-            try:
-                quantity = int(free)
-                client.order_market_sell(symbol=symbol, quantity=quantity)
-                send_telegram(f"Sold {quantity} {coin} to USDT")
-            except Exception as e:
-                print(f"Failed to sell {coin}: {e}")
-
-def buy_banana():
+def buy_banana_if_price_drops(reference_price):
     usdt = get_balance("USDT")
-    price = get_price(symbol_to_buy)
-    if usdt > min_trade_value and price:
-        quantity = round(usdt / price, 0)
-        if quantity > 0:
-            try:
-                client.order_market_buy(symbol=symbol_to_buy, quantity=quantity)
-                send_telegram(f"Bought {quantity} BANANA @ {price}")
-            except Exception as e:
-                print(f"Failed to buy BANANA: {e}")
+    if usdt < 0.001:
+        return None
 
-def run_bot_loop():
+    current_price = get_price(symbol)
+    if not current_price or current_price > reference_price:
+        return None
+
+    quantity = round(usdt / current_price, 0)
+    if quantity >= 1:
+        try:
+            order = client.order_market_buy(symbol=symbol, quantity=quantity)
+            send_telegram(f"Bought {quantity} BANANA at {current_price}")
+            return current_price
+        except Exception as e:
+            print(f"[Buy Error] {e}")
+    return None
+
+def sell_banana_if_profit(buy_price):
+    quantity = get_balance("BANANA")
+    if quantity < 1:
+        return False
+
+    current_price = get_price(symbol)
+    if not current_price:
+        return False
+
+    profit_pct = (current_price - buy_price) / buy_price
+    if profit_pct >= take_profit_pct:
+        try:
+            client.order_market_sell(symbol=symbol, quantity=int(quantity))
+            send_telegram(f"Sold {quantity} BANANA at {current_price} (Profit {round(profit_pct*100, 2)}%)")
+            return True
+        except Exception as e:
+            print(f"[Sell Profit Error] {e}")
+    return False
+
+def run_bot():
+    send_telegram("Bot is active and running every 5 minutes.")
+    reference_price = get_price(symbol)
+    buy_price = None
+
     while True:
-        sell_all_assets_to_usdt()
-        buy_banana()
-        send_telegram("Bot still running... (heartbeat)")
-        time.sleep(300)  # Dakika 5
+        try:
+            sell_all_tokens_to_usdt()
+
+            if not buy_price:
+                buy_price = buy_banana_if_price_drops(reference_price)
+            else:
+                sold = sell_banana_if_profit(buy_price)
+                if sold:
+                    buy_price = None
+                    reference_price = get_price(symbol)
+
+            send_telegram("Heartbeat: Bot is alive.")
+        except Exception as e:
+            send_telegram(f"[Bot Error] {e}")
+
+        time.sleep(check_interval)
 
 if __name__ == "__main__":
-    import threading
-    threading.Thread(target=run_bot_loop).start()
-    app.run(host="0.0.0.0", port=8080)
+    run_bot()
