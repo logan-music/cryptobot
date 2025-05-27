@@ -1,0 +1,15 @@
+app = "cryptobot-azkh-a"  # jina hili litokane na Fly.io app yako
+
+[build]
+  image = "python:3.11"  # au 3.10 au 3.9 kutegemea unachotumia
+
+[env]
+  PYTHONUNBUFFERED = "TRUE"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
