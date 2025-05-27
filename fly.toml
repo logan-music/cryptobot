@@ -5,6 +5,9 @@ app = "cryptobot-azkh-a"
 
 [env]
   PYTHONUNBUFFERED = "TRUE"
+  
+[deploy]
+  command = "python main.py"
 
 [[services]]
   internal_port = 8080
