@@ -1,7 +1,7 @@
-app = "cryptobot-azkh-a"  # jina hili litokane na Fly.io app yako
+app = "cryptobot-azkh-a"
 
 [build]
-  image = "python:3.11"  # au 3.10 au 3.9 kutegemea unachotumia
+  image = "python:3.11"
 
 [env]
   PYTHONUNBUFFERED = "TRUE"
