@@ -1,0 +1,4 @@
+binance
+python-dotenv
+requests
+flask
