@@ -2,30 +2,68 @@ import time
 import requests
 from binance.client import Client
 
-# Binance credentials (HARD-CODED — USITUMIE HADHARANI)
+# ======= Plain Keys ========
 API_KEY = "t99fN1MWcaFytKHwEhec6PuW72Ptf4NpzExyI8c0U2PMaoYL7kDdop7IJPzyxLEb"
 API_SECRET = "3anCWYwyAQDR5WPaapu8V3pcYYKrdqup0LPQfYGldGClEE0zPiXe7qLrTxhUFeM0"
-
-# Telegram credentials
-BOT_TOKEN = "7333244671:AAGih9nJ7Unze9bmdB65odJrnEuSs9adnJw"
+BOT_TOKEN = "7501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
 CHAT_ID = "6978133426"
 
-# Connect to Binance
 client = Client(API_KEY, API_SECRET)
 
-# Function to send Telegram message
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message}
+# Telegram message function
+def send_telegram(message):
     try:
-        response = requests.post(url, data=payload)
-        if response.status_code != 200:
-            print("Telegram error:", response.text)
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": message})
     except Exception as e:
-        print("Telegram exception:", e)
+        print("Telegram Error:", e)
 
-# Function to check wallet and sell coins above $0.001
+# Auto-sell coins above $0.001
 def auto_sell():
+    balances = client.get_account()['balances']
+    for coin in balances:
+        asset = coin['asset']
+        free = float(coin['free'])
+        if asset in ["USDT", "BNB"] or free == 0:
+            continue
+        symbol = asset + "USDT"
+        try:
+            price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+            value = free * price
+            if value >= 0.001:
+                client.order_market_sell(symbol=symbol, quantity=free)
+                send_telegram(f"🔻 Ameuza {free:.6f} {asset} (${value:.6f})")
+        except:
+            pass
+
+# Buy cheap coins
+def buy_cheap():
+    usdt = float(client.get_asset_balance(asset="USDT")['free'])
+    if usdt < 0.001:
+        return
+
+    targets = {
+        "BANANAUSDT": 0.002,
+        "PEPEUSDT": 0.000001,
+        "VRAUSDT": 0.004,
+        "FLOKIUSDT": 0.00001,
+        "SHIBUSDT": 0.00001
+    }
+
+    for symbol, low_price in targets.items():
+        try:
+            price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+            if price <= low_price:
+                qty = round(usdt / price, 2)
+                if qty * price > 0.001:
+                    client.order_market_buy(symbol=symbol, quantity=qty)
+                    send_telegram(f"🟢 Amenunua {qty} {symbol.replace('USDT','')} kwa ${usdt}")
+                    break  # Nunua coin moja tu kwa mzunguko huu
+        except:
+            continue
+
+# Sell if profit is 5%+
+def smart_profit_sell():
     balances = client.get_account()['balances']
     for coin in balances:
         asset = coin['asset']
@@ -34,41 +72,29 @@ def auto_sell():
             continue
         symbol = asset + "USDT"
         try:
+            trades = client.get_my_trades(symbol=symbol)
+            if not trades:
+                continue
+            buy_price = float(trades[-1]['price'])
             price = float(client.get_symbol_ticker(symbol=symbol)['price'])
-            value = free * price
-            if value >= 0.001:
-                order = client.order_market_sell(symbol=symbol, quantity=free)
-                send_telegram_message(f"Ameuza {free:.6f} {asset} kwa takriban ${value:.6f}")
-        except Exception as e:
-            pass  # Symbol might not exist or other error
+            if price >= buy_price * 1.05:
+                client.order_market_sell(symbol=symbol, quantity=free)
+                send_telegram(f"✅ Ameuza kwa faida {asset}: {free} @ ${price}")
+        except:
+            pass
 
-# Function to buy BANANAUSDT when price drops
-def buy_banana():
-    symbol = "BANANAUSDT"
-    try:
-        price = float(client.get_symbol_ticker(symbol=symbol)['price'])
-        if price < 0.002:  # bei ndogo
-            usdt_balance = float(client.get_asset_balance(asset='USDT')['free'])
-            if usdt_balance > 0.001:
-                amount = usdt_balance / price
-                order = client.order_market_buy(symbol=symbol, quantity=round(amount, 2))
-                send_telegram_message(f"Amenunua {round(amount, 2)} BANANA kwa ${usdt_balance}")
-    except Exception as e:
-        pass
-
-# Heartbeat notification every 5 minutes
+# Main loop
 last_ping = 0
-
 while True:
     try:
-        current_time = time.time()
-        if current_time - last_ping >= 300:  # every 5 minutes
-            send_telegram_message("✅ Bot inaendelea kukimbia vizuri (heartbeat)")
-            last_ping = current_time
+        if time.time() - last_ping >= 600:
+            send_telegram("💓 Bot inafanya kazi (heartbeat)")
+            last_ping = time.time()
 
         auto_sell()
-        buy_banana()
-        time.sleep(30)  # delay between loops
+        smart_profit_sell()
+        buy_cheap()
+        time.sleep(20)
     except Exception as e:
-        send_telegram_message(f"⛔ Error kwenye bot: {e}")
+        send_telegram(f"⚠️ Error kwenye bot: {str(e)}")
         time.sleep(60)
