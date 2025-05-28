@@ -20,6 +20,25 @@ def send_telegram(message):
     except Exception as e:
         print("Telegram Error:", e)
 
+# === COINS ZA KUNUNUA NA THRESHOLDS ZAO ===
+cheap_targets = [
+    {"symbol": "PEPEUSDT", "buy_below": 0.0000015},
+    {"symbol": "SHIBUSDT", "buy_below": 0.000003},
+    {"symbol": "FLOKIUSDT", "buy_below": 0.0003},
+    {"symbol": "BONKUSDT", "buy_below": 0.00003},
+    {"symbol": "DOGEUSDT", "buy_below": 0.001},
+    {"symbol": "AKITAUSDT", "buy_below": 0.0000004},
+    {"symbol": "BABYDOGEUSDT", "buy_below": 0.0000000015}
+]
+
+# === GET STEP SIZE FOR SYMBOL ===
+def get_step_size(symbol):
+    info = client.get_symbol_info(symbol)
+    for filt in info["filters"]:
+        if filt["filterType"] == "LOT_SIZE":
+            return float(filt["stepSize"])
+    return 1  # fallback
+
 # === AUTO SELL ALL COINS > $0.001 ===
 def auto_sell():
     balances = client.get_account()["balances"]
@@ -33,37 +52,36 @@ def auto_sell():
             price = float(client.get_symbol_ticker(symbol=symbol)["price"])
             value = free * price
             if value >= 0.001:
-                client.order_market_sell(symbol=symbol, quantity=free)
-                send_telegram(f"Ameuza {free:.6f} {asset} kwa takriban ${value:.6f}")
+                step = get_step_size(symbol)
+                qty = round(free - (free % step), 6)
+                if qty > 0:
+                    client.order_market_sell(symbol=symbol, quantity=qty)
+                    send_telegram(f"Ameuza {qty} {asset} kwa takriban ${value:.6f}")
         except:
             pass
 
-# === COINS ZA KUNUNUA NA THRESHOLDS ZAO ===
-cheap_targets = [
-    {"symbol": "PEPEUSDT", "buy_below": 0.0000015},
-    {"symbol": "SHIBUSDT", "buy_below": 0.000003},
-    {"symbol": "FLOKIUSDT", "buy_below": 0.0003},
-    {"symbol": "BONKUSDT", "buy_below": 0.00003},
-    {"symbol": "DOGEUSDT", "buy_below": 0.001},
-    {"symbol": "AKITAUSDT", "buy_below": 0.0000004},
-    {"symbol": "BABYDOGEUSDT", "buy_below": 0.0000000015}
-]
 # === LOGIC YA KUNUNUA COINS ===
 def auto_buy():
     try:
         usdt_balance = float(client.get_asset_balance(asset="USDT")["free"])
         if usdt_balance < 0.001:
             return
+        budget = usdt_balance / 3  # Nunua max coin 3
         for coin in cheap_targets:
             symbol = coin["symbol"]
             threshold = coin["buy_below"]
-            price = float(client.get_symbol_ticker(symbol=symbol)["price"])
-            if price < threshold:
-                qty = round(usdt_balance / price, 2)
-                if qty > 0:
-                    client.order_market_buy(symbol=symbol, quantity=qty)
-                    send_telegram(f"Amenunua {qty} {symbol.replace('USDT','')} kwa ${usdt_balance}")
-                    break
+            try:
+                price = float(client.get_symbol_ticker(symbol=symbol)["price"])
+                if price < threshold:
+                    step = get_step_size(symbol)
+                    qty = round(budget / price, 6)
+                    qty = qty - (qty % step)
+                    if qty > 0:
+                        client.order_market_buy(symbol=symbol, quantity=qty)
+                        send_telegram(f"Amenunua {qty} {symbol.replace('USDT','')} kwa ${budget:.6f}")
+                        break
+            except:
+                continue
     except Exception as e:
         print("Buy error:", e)
 
