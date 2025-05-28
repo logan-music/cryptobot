@@ -1,15 +1,14 @@
-import os
 import time
 import requests
 from binance.client import Client
 
-# Binance credentials
-API_KEY = os.getenv("BINANCE_API_KEY")
-API_SECRET = os.getenv("BINANCE_API_SECRET")
+# Binance credentials (HARD-CODED — USITUMIE HADHARANI)
+API_KEY = "t99fN1MWcaFytKHwEhec6PuW72Ptf4NpzExyI8c0U2PMaoYL7kDdop7IJPzyxLEb"
+API_SECRET = "3anCWYwyAQDR5WPaapu8V3pcYYKrdqup0LPQfYGldGClEE0zPiXe7qLrTxhUFeM0"
 
 # Telegram credentials
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+BOT_TOKEN = "7333244671:AAGih9nJ7Unze9bmdB65odJrnEuSs9adnJw"
+CHAT_ID = "6978133426"
 
 # Connect to Binance
 client = Client(API_KEY, API_SECRET)
