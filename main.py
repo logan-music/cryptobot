@@ -1,7 +1,7 @@
 import requests
 
 # Telegram credentials
-BOT_TOKEN = "7333244671:AAGih9nJ7Unze9bmdB65odJrnEuSs9adnJw"
+BOT_TOKEN = "7501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
 CHAT_ID = "6978133426"
 
 # Ujumbe wa test
