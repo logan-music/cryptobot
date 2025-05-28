@@ -1,4 +1,1 @@
-python-dotenv
 requests
-flask
-python-binance
