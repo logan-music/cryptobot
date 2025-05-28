@@ -1,0 +1,20 @@
+app = "cryptobot-j44edw"
+primary_region = "lhr"
+
+[env]
+PORT = "8080"
+
+[deploy]
+  command = "python main.py"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
