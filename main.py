@@ -87,7 +87,7 @@ def smart_profit_sell():
 last_ping = 0
 while True:
     try:
-        if time.time() - last_ping >= 600:
+        if time.time() - last_ping >= 7200:
             send_telegram("💓 Bot inafanya kazi (heartbeat)")
             last_ping = time.time()
 
