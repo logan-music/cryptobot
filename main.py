@@ -40,16 +40,14 @@ def auto_sell():
 
 # === COINS ZA KUNUNUA NA THRESHOLDS ZAO ===
 cheap_targets = [
-    {"symbol": "BANANAS31", "buy_below": 0.003},
-    {"symbol": "PEPE", "buy_below": 0.0000015},
-    {"symbol": "TON", "buy_below": 0.000004},
-    {"symbol": "SHIB", "buy_below": 0.000003},
-    {"symbol": "SIU", "buy_below": 0.00003},
-    {"symbol": "UNI", "buy_below": 0.00003},
-    {"symbol": "NIL", "buy_below": 0.00004},
-    {"symbol": "CUTUS", "buy_below": 0.00004}
+    {"symbol": "PEPEUSDT", "buy_below": 0.0000015},
+    {"symbol": "SHIBUSDT", "buy_below": 0.000003},
+    {"symbol": "FLOKIUSDT", "buy_below": 0.0003},
+    {"symbol": "BONKUSDT", "buy_below": 0.00003},
+    {"symbol": "DOGEUSDT", "buy_below": 0.001},
+    {"symbol": "AKITAUSDT", "buy_below": 0.0000004},
+    {"symbol": "BABYDOGEUSDT", "buy_below": 0.0000000015}
 ]
-
 # === LOGIC YA KUNUNUA COINS ===
 def auto_buy():
     try:
