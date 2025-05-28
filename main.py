@@ -1,103 +1,98 @@
+
 import time
 import requests
 from binance.client import Client
+from binance.enums import *
+from binance.exceptions import BinanceAPIException
 
-# === BINANCE & TELEGRAM KEYS (PLAIN TEXT) ===
-API_KEY = "t99fN1MWcaFytKHwEhec6PuW72Ptf4NpzExyI8c0U2PMaoYL7kDdop7IJPzyxLEb"
-API_SECRET = "3anCWYwyAQDR5WPaapu8V3pcYYKrdqup0LPQfYGldGClEE0zPiXe7qLrTxhUFeM0"
-BOT_TOKEN = "7501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
-CHAT_ID = "6978133426"
+# ==== API Keys (Wazi) ====
+API_KEY = "A0N0ctDbfyMPC6lHdTCVkmnhNNeMZKcJKFO2dkOUaQRM7uJUu9uvA9ZnZzsjNnLh"
+API_SECRET = "F8Ckh8rGsBh1zP4NOeAfVvGrgWx7RZoFQ4BE6oEkuVjAf1evU7xOPUBN6gHzgtnT"
 
-# === BINANCE CLIENT ===
+# ==== Telegram Notification ====
+BOT_TOKEN = "7098570087:AAGYTmSTvP3_3WeF8zrmYVY-vzyC1rJ8Djs"
+CHAT_ID = "6753870733"
+
+# ==== Settings ====
+TRADE_DELAY = 20  # seconds
+MIN_TRADE_USD = 0.001
+
+# ==== Coins za kununua automatically ====
+CHEAP_COINS = [
+    'BANANAUSDT', 'SHIBUSDT', 'PEPEUSDT', 'FLOKIUSDT',
+    'BONKUSDT', 'LUNCUSDT', 'SPELLUSDT', 'DENTUSDT',
+    'SCUSDT', 'LEVEUSDT', 'SOLVUSDT', 'STOUSDT', 'TONUSDT'
+]
+
+# ==== Start Binance client ====
 client = Client(API_KEY, API_SECRET)
 
-# === SEND TELEGRAM MESSAGE ===
-def send_telegram(message):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message}
+def notify(msg):
     try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        payload = {"chat_id": CHAT_ID, "text": msg}
         requests.post(url, data=payload)
     except Exception as e:
         print("Telegram Error:", e)
 
-# === COINS ZA KUNUNUA NA THRESHOLDS ZAO ===
-cheap_targets = [
-    {"symbol": "PEPEUSDT", "buy_below": 0.0000015},
-    {"symbol": "SHIBUSDT", "buy_below": 0.000003},
-    {"symbol": "FLOKIUSDT", "buy_below": 0.0003},
-    {"symbol": "BONKUSDT", "buy_below": 0.00003},
-    {"symbol": "DOGEUSDT", "buy_below": 0.001},
-    {"symbol": "AKITAUSDT", "buy_below": 0.0000004},
-    {"symbol": "BABYDOGEUSDT", "buy_below": 0.0000000015}
-]
-
-# === GET STEP SIZE FOR SYMBOL ===
-def get_step_size(symbol):
-    info = client.get_symbol_info(symbol)
-    for filt in info["filters"]:
-        if filt["filterType"] == "LOT_SIZE":
-            return float(filt["stepSize"])
-    return 1  # fallback
-
-# === AUTO SELL ALL COINS > $0.001 ===
-def auto_sell():
-    balances = client.get_account()["balances"]
-    for coin in balances:
-        asset = coin["asset"]
-        free = float(coin["free"])
-        if asset == "USDT" or free == 0:
-            continue
-        symbol = asset + "USDT"
-        try:
-            price = float(client.get_symbol_ticker(symbol=symbol)["price"])
-            value = free * price
-            if value >= 0.001:
-                step = get_step_size(symbol)
-                qty = round(free - (free % step), 6)
-                if qty > 0:
-                    client.order_market_sell(symbol=symbol, quantity=qty)
-                    send_telegram(f"Ameuza {qty} {asset} kwa takriban ${value:.6f}")
-        except:
-            pass
-
-# === LOGIC YA KUNUNUA COINS ===
-def auto_buy():
+def transfer_funding_to_spot():
     try:
-        usdt_balance = float(client.get_asset_balance(asset="USDT")["free"])
-        if usdt_balance < 0.001:
-            return
-        budget = usdt_balance / 3  # Nunua max coin 3
-        for coin in cheap_targets:
-            symbol = coin["symbol"]
-            threshold = coin["buy_below"]
-            try:
-                price = float(client.get_symbol_ticker(symbol=symbol)["price"])
-                if price < threshold:
-                    step = get_step_size(symbol)
-                    qty = round(budget / price, 6)
-                    qty = qty - (qty % step)
-                    if qty > 0:
-                        client.order_market_buy(symbol=symbol, quantity=qty)
-                        send_telegram(f"Amenunua {qty} {symbol.replace('USDT','')} kwa ${budget:.6f}")
-                        break
-            except:
-                continue
+        result = client.get_funding_wallet()
+        for asset in result['assets']:
+            name = asset['asset']
+            balance = float(asset['free'])
+            if balance > 0:
+                client.transfer_funding_to_spot(asset=name, amount=balance)
+                notify(f"✅ Transferred {balance} {name} from Funding to Spot")
     except Exception as e:
-        print("Buy error:", e)
+        notify(f"⚠️ Transfer Error: {e}")
 
-# === MAIN LOOP ===
-last_ping = 0
+def sell_other_assets():
+    account = client.get_account()
+    for balance in account['balances']:
+        asset = balance['asset']
+        free = float(balance['free'])
+        if free > 0 and asset != 'USDT':
+            symbol = asset + 'USDT'
+            try:
+                price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+                value = price * free
+                if value >= MIN_TRADE_USD:
+                    info = client.get_symbol_info(symbol)
+                    step_size = float([f for f in info['filters'] if f['filterType'] == 'LOT_SIZE'][0]['stepSize'])
+                    qty = int(free / step_size) * step_size
+                    qty = round(qty, 6)
+                    client.order_market_sell(symbol=symbol, quantity=qty)
+                    notify(f"✅ Sold {qty} {asset} (~${value:.5f})")
+                    time.sleep(TRADE_DELAY)
+            except Exception as e:
+                notify(f"❌ Sell Error on {symbol}: {e}")
 
+def buy_cheap_coins():
+    usdt = float(client.get_asset_balance(asset='USDT')['free'])
+    if usdt < MIN_TRADE_USD:
+        notify("⚠️ Not enough USDT to buy cheap coins.")
+        return
+    portion = usdt / len(CHEAP_COINS)
+    for symbol in CHEAP_COINS:
+        try:
+            price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+            qty = round(portion / price, 0)
+            if qty > 0:
+                client.order_market_buy(symbol=symbol, quantity=qty)
+                notify(f"✅ Bought {qty} of {symbol}")
+                time.sleep(TRADE_DELAY)
+        except Exception as e:
+            notify(f"❌ Buy Error on {symbol}: {e}")
+
+# ==== Main Bot Loop ====
 while True:
     try:
-        if time.time() - last_ping >= 7200:
-            send_telegram("💓 Bot inafanya kazi")
-            last_ping = time.time()
-
-        auto_sell()
-        auto_buy()
-        time.sleep(20)
-
-    except Exception as e:
-        send_telegram(f"⛔ Error kwenye bot: {e}")
-        time.sleep(60)
+        notify("🤖 Bot Started Cycle...")
+        transfer_funding_to_spot()
+        sell_other_assets()
+        buy_cheap_coins()
+        notify("✅ Cycle Completed. Waiting for next...")
+    except Exception as error:
+        notify(f"❌ Unexpected Error: {error}")
+    time.sleep(TRADE_DELAY)
