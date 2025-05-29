@@ -85,21 +85,31 @@ def transfer_funding_to_spot():
 
 def transfer_funding_to_spot():
     try:
+        # Step 1: Fetch all funding assets
         url = "https://api.binance.com/sapi/v1/asset/get-funding-asset"
-        headers = {'X-MBX-APIKEY': API_KEY}
-        params = {'timestamp': int(time.time() * 1000)}
+        headers = {
+            'X-MBX-APIKEY': API_KEY
+        }
+        params = {
+            'timestamp': int(time.time() * 1000)
+        }
 
+        # Sign the query
+        import hmac, hashlib, urllib.parse
         query_string = urllib.parse.urlencode(params)
         signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
         full_url = f"{url}?{query_string}&signature={signature}"
 
+        # Binance requires this call as POST
         response = requests.post(full_url, headers=headers)
         assets = response.json()
 
+        # DEBUG output
         notify(f"📦 Binance Response: {assets}")
 
+        # Step 2: Loop through assets and transfer if balance > 0
         if not isinstance(assets, list):
-            notify("⚠️ Transfer Error: Unexpected response format (not a list).")
+            notify("⚠️ Transfer Error: Expected a list of assets.")
             time.sleep(600)
             return
 
@@ -109,20 +119,25 @@ def transfer_funding_to_spot():
             if balance > 0:
                 transfer_url = "https://api.binance.com/sapi/v1/asset/transfer"
                 transfer_params = {
-                    'type': 1,
+                    'type': 1,  # Funding → Spot
                     'asset': name,
                     'amount': balance,
                     'timestamp': int(time.time() * 1000)
                 }
-                transfer_query = urllib.parse.urlencode(transfer_params)
-                transfer_signature = hmac.new(API_SECRET.encode(), transfer_query.encode(), hashlib.sha256).hexdigest()
-                transfer_full_url = f"{transfer_url}?{transfer_query}&signature={transfer_signature}"
 
-                transfer_response = requests.post(transfer_full_url, headers=headers)
+                # Sign parameters and append to data
+                query = urllib.parse.urlencode(transfer_params)
+                signature = hmac.new(API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
+                transfer_params['signature'] = signature
+
+                # Send POST with data=transfer_params
+                transfer_response = requests.post(transfer_url, headers=headers, data=transfer_params)
+
                 if transfer_response.status_code == 200:
                     notify(f"✅ Transferred {balance} {name} from Funding to Spot")
                 else:
                     notify(f"❌ Transfer Failed: {transfer_response.text}")
+
         time.sleep(5)
 
     except Exception as e:
