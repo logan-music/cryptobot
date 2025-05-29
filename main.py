@@ -9,7 +9,7 @@ API_KEY = "t99fN1MWcaFytKHwEhec6PuW72Ptf4NpzExyl8c0U2PMaoYL7kDdop7IJPzyxLEb"
 API_SECRET = "3anCWYwyAQDR5WPaapu8V3pcYYKrdqup0LPQfYGIdGCIEE0zPiXe7qLrTxhUFeM0"
 
 # ==== Telegram Notification ====
-BOT_TOKEN = "7501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
+BOT_TOKEN = "501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
 CHAT_ID = "6978133426"
 
 # ==== Settings ====
