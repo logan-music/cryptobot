@@ -51,14 +51,19 @@ def transfer_funding_to_spot():
         signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
         full_url = f"{url}?{query_string}&signature={signature}"
 
-        # FIXED: Use POST not GET
         response = requests.post(full_url, headers=headers)
         data = response.json()
 
-        # DEBUG response content
+        # Debug: show raw response
         notify(f"📦 Binance Response: {data}")
 
-        assets = data.get('data') or data.get('assets') or data
+        # FIX: Check if response is list or dict
+        if isinstance(data, list):
+            assets = data
+        elif isinstance(data, dict):
+            assets = data.get('data') or data.get('assets') or []
+        else:
+            assets = []
 
         if not isinstance(assets, list):
             notify("⚠️ Transfer Error: Unexpected data format from Binance.")
