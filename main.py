@@ -10,7 +10,7 @@ API_SECRET = "3anCWYwyAQDR5WPaapu8V3pcYYKrdqup0LPQfYGIdGCIEE0zPiXe7qLrTxhUFeM0"
 
 # ==== Telegram Notification ====
 BOT_TOKEN = "7501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
-CHAT_ID = "6753870733"
+CHAT_ID = "6978133426"
 
 # ==== Settings ====
 TRADE_DELAY = 20  # seconds
