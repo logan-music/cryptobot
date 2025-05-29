@@ -1,4 +1,3 @@
-
 import time
 import requests
 from binance.client import Client
@@ -10,7 +9,7 @@ API_KEY = "A0N0ctDbfyMPC6lHdTCVkmnhNNeMZKcJKFO2dkOUaQRM7uJUu9uvA9ZnZzsjNnLh"
 API_SECRET = "F8Ckh8rGsBh1zP4NOeAfVvGrgWx7RZoFQ4BE6oEkuVjAf1evU7xOPUBN6gHzgtnT"
 
 # ==== Telegram Notification ====
-BOT_TOKEN = "7098570087:AAGYTmSTvP3_3WeF8zrmYVY-vzyC1rJ8Djs"
+BOT_TOKEN = "7501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
 CHAT_ID = "6753870733"
 
 # ==== Settings ====
