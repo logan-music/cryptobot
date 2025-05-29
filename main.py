@@ -3,6 +3,7 @@ import requests
 from binance.client import Client
 from binance.enums import *
 from binance.exceptions import BinanceAPIException
+import hmac, hashlib, urllib.parse
 
 # ==== API Keys (Wazi) ====
 API_KEY = "iqHagbaiABKRNapKslzKZZHKq8ooYjTpOfypXnK0YQBFy2qXDMjd2HQ59m5RJNQa"
@@ -13,9 +14,9 @@ BOT_TOKEN = "7501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
 CHAT_ID = "6978133426"
 
 # ==== Settings ====
-TRADE_DELAY = 20  # sekunde kati ya trades
-ERROR_DELAY = 300  # sekunde 300 = dakika 5
-MIN_TRADE_USD = 0.001
+TRADE_DELAY = 20         # sekunde kati ya trades
+ERROR_DELAY = 300        # sekunde 300 = dakika 5
+MIN_TRADE_USD = 0.001    # kiwango cha chini kuuza coin yoyote
 
 # ==== Coins za kununua automatically ====
 CHEAP_COINS = [
@@ -38,15 +39,9 @@ def notify(msg):
 def transfer_funding_to_spot():
     try:
         url = "https://api.binance.com/sapi/v1/asset/get-funding-asset"
-        headers = {
-            'X-MBX-APIKEY': API_KEY
-        }
-        params = {
-            'timestamp': int(time.time() * 1000)
-        }
+        headers = {'X-MBX-APIKEY': API_KEY}
+        params = {'timestamp': int(time.time() * 1000)}
 
-        # Sign params
-        import hmac, hashlib, urllib.parse
         query_string = urllib.parse.urlencode(params)
         signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
         full_url = f"{url}?{query_string}&signature={signature}"
@@ -55,14 +50,7 @@ def transfer_funding_to_spot():
         data = response.json()
 
         notify(f"📦 Binance Response: {data}")
-
-        # Check data type
-        if isinstance(data, list):
-            assets = data
-        elif isinstance(data, dict):
-            assets = data.get('data') or data.get('assets') or []
-        else:
-            assets = []
+        assets = data.get('data') or data.get('assets') or data
 
         if not isinstance(assets, list):
             notify("⚠️ Transfer Error: Unexpected data format from Binance.")
@@ -75,7 +63,7 @@ def transfer_funding_to_spot():
             if balance > 0:
                 transfer_url = "https://api.binance.com/sapi/v1/asset/transfer"
                 transfer_params = {
-                    'type': '1',  # FIXED: Must be string
+                    'type': 1,
                     'asset': name,
                     'amount': balance,
                     'timestamp': int(time.time() * 1000)
@@ -94,7 +82,7 @@ def transfer_funding_to_spot():
     except Exception as e:
         notify(f"⚠️ Transfer Error: {e}")
         time.sleep(600)
-        
+
 def sell_other_assets():
     try:
         account = client.get_account()
