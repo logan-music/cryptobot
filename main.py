@@ -37,9 +37,10 @@ def notify(msg):
 
 def transfer_funding_to_spot():
     try:
+        # Get list of assets in Funding Wallet
         result = client._request(
             method='GET',
-            path='/sapi/v1/asset/get-funding-asset',
+            uri='/sapi/v1/asset/get-funding-asset',
             signed=True
         )
         for asset in result:
@@ -48,10 +49,10 @@ def transfer_funding_to_spot():
             if balance > 0:
                 client._request(
                     method='POST',
-                    path='/sapi/v1/asset/transfer',
+                    uri='/sapi/v1/asset/transfer',
                     signed=True,
                     data={
-                        'type': 1,
+                        'type': '1',  # 1 = Funding -> Spot
                         'asset': name,
                         'amount': balance
                     }
@@ -59,7 +60,7 @@ def transfer_funding_to_spot():
                 notify(f"✅ Transferred {balance} {name} from Funding to Spot")
     except Exception as e:
         notify(f"⚠️ Transfer Error: {e}")
-        time.sleep(ERROR_DELAY)
+        time.sleep(600)  # delay 10 mins if error
 
 def sell_other_assets():
     try:
