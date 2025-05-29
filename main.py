@@ -51,13 +51,11 @@ def transfer_funding_to_spot():
         signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
         full_url = f"{url}?{query_string}&signature={signature}"
 
-        response = requests.get(full_url, headers=headers)
+        # FIXED: Use POST not GET
+        response = requests.post(full_url, headers=headers)
         data = response.json()
 
-        # Try kuchukua list ya assets kwa njia tofauti
-        data = response.json()
-
-        # DEBUG: Onyesha majibu ya Binance kwa Telegram
+        # DEBUG response content
         notify(f"📦 Binance Response: {data}")
 
         assets = data.get('data') or data.get('assets') or data
@@ -91,7 +89,7 @@ def transfer_funding_to_spot():
 
     except Exception as e:
         notify(f"⚠️ Transfer Error: {e}")
-        time.sleep(600)  # delay ya dakika 10
+        time.sleep(600)
         
 def sell_other_assets():
     try:
