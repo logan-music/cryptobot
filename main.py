@@ -52,7 +52,16 @@ def transfer_funding_to_spot():
         full_url = f"{url}?{query_string}&signature={signature}"
 
         response = requests.get(full_url, headers=headers)
-        assets = response.json()
+        data = response.json()
+
+        # Try kuchukua list ya assets kwa njia tofauti
+        assets = data.get('data') or data.get('assets') or data
+
+        # Hakikisha ni list, kama siyo tuma error na exit
+        if not isinstance(assets, list):
+            notify("⚠️ Transfer Error: Unexpected data format from Binance.")
+            time.sleep(600)
+            return
 
         for asset in assets:
             name = asset['asset']
@@ -79,7 +88,7 @@ def transfer_funding_to_spot():
     except Exception as e:
         notify(f"⚠️ Transfer Error: {e}")
         time.sleep(600)  # delay ya dakika 10
-
+        
 def sell_other_assets():
     try:
         account = client.get_account()
