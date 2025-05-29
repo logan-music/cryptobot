@@ -5,8 +5,8 @@ from binance.enums import *
 from binance.exceptions import BinanceAPIException
 
 # ==== API Keys (Wazi) ====
-API_KEY = "A0N0ctDbfyMPC6lHdTCVkmnhNNeMZKcJKFO2dkOUaQRM7uJUu9uvA9ZnZzsjNnLh"
-API_SECRET = "F8Ckh8rGsBh1zP4NOeAfVvGrgWx7RZoFQ4BE6oEkuVjAf1evU7xOPUBN6gHzgtnT"
+API_KEY = "t99fN1MWcaFytKHwEhec6PuW72Ptf4NpzExyl8c0U2PMaoYL7kDdop7IJPzyxLEb"
+API_SECRET = "3anCWYwyAQDR5WPaapu8V3pcYYKrdqup0LPQfYGIdGCIEE0zPiXe7qLrTxhUFeM0"
 
 # ==== Telegram Notification ====
 BOT_TOKEN = "7501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
