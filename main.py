@@ -40,11 +40,9 @@ def notify(msg):
 
 def transfer_funding_to_spot():
     try:
-        # Step 1: Get funding assets
         url = "https://api.binance.com/sapi/v1/asset/get-funding-asset"
         headers = {'X-MBX-APIKEY': API_KEY}
         params = {'timestamp': int(time.time() * 1000)}
-
         query_string = urllib.parse.urlencode(params)
         signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
         full_url = f"{url}?{query_string}&signature={signature}"
@@ -61,27 +59,27 @@ def transfer_funding_to_spot():
         for asset in assets:
             name = asset['asset']
             balance = float(asset['free'])
-            if balance > 0:
+            if balance >= 0.0001:  # Ignore tiny balances
                 transfer_params = {
                     'type': 1,
                     'asset': name,
-                    'amount': balance,
+                    'amount': f"{balance:.8f}",
                     'timestamp': int(time.time() * 1000)
                 }
                 transfer_query = urllib.parse.urlencode(transfer_params)
-                transfer_signature = hmac.new(API_SECRET.encode(), transfer_query.encode(), hashlib.sha256).hexdigest()
-                transfer_url = f"https://api.binance.com/sapi/v1/asset/transfer?{transfer_query}&signature={transfer_signature}"
+                signature = hmac.new(API_SECRET.encode(), transfer_query.encode(), hashlib.sha256).hexdigest()
+                transfer_url = f"https://api.binance.com/sapi/v1/asset/transfer?{transfer_query}&signature={signature}"
 
-                transfer_response = requests.post(transfer_url, headers=headers)
-                if transfer_response.status_code == 200:
+                result = requests.post(transfer_url, headers=headers)
+                if result.status_code == 200:
                     notify(f"✅ Transferred {balance} {name} from Funding to Spot")
                 else:
-                    notify(f"❌ Transfer Failed: {transfer_response.text}")
+                    notify(f"❌ Transfer Failed: {result.text}")
         time.sleep(5)
     except Exception as e:
         notify(f"⚠️ Transfer Error: {e}")
         time.sleep(600)
-
+        
 def sell_other_assets():
     try:
         account = client.get_account()
