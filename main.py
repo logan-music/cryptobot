@@ -45,7 +45,7 @@ def transfer_funding_to_spot():
             'timestamp': int(time.time() * 1000)
         }
 
-        # Sign the params
+        # Sign params
         import hmac, hashlib, urllib.parse
         query_string = urllib.parse.urlencode(params)
         signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
@@ -54,10 +54,9 @@ def transfer_funding_to_spot():
         response = requests.post(full_url, headers=headers)
         data = response.json()
 
-        # Debug: show raw response
         notify(f"📦 Binance Response: {data}")
 
-        # FIX: Check if response is list or dict
+        # Check data type
         if isinstance(data, list):
             assets = data
         elif isinstance(data, dict):
@@ -76,7 +75,7 @@ def transfer_funding_to_spot():
             if balance > 0:
                 transfer_url = "https://api.binance.com/sapi/v1/asset/transfer"
                 transfer_params = {
-                    'type': 1,  # Funding to Spot
+                    'type': '1',  # FIXED: Must be string
                     'asset': name,
                     'amount': balance,
                     'timestamp': int(time.time() * 1000)
