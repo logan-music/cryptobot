@@ -55,9 +55,13 @@ def transfer_funding_to_spot():
         data = response.json()
 
         # Try kuchukua list ya assets kwa njia tofauti
+        data = response.json()
+
+        # DEBUG: Onyesha majibu ya Binance kwa Telegram
+        notify(f"📦 Binance Response: {data}")
+
         assets = data.get('data') or data.get('assets') or data
 
-        # Hakikisha ni list, kama siyo tuma error na exit
         if not isinstance(assets, list):
             notify("⚠️ Transfer Error: Unexpected data format from Binance.")
             time.sleep(600)
