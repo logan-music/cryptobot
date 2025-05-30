@@ -38,7 +38,6 @@ def notify(msg):
 
 def transfer_funding_to_spot():
     try:
-        # Step 1: Get list of funding assets
         url = "https://api.binance.com/sapi/v1/asset/get-funding-asset"
         headers = {
             'X-MBX-APIKEY': API_KEY
@@ -47,47 +46,55 @@ def transfer_funding_to_spot():
             'timestamp': int(time.time() * 1000)
         }
 
+        # Sign the request
         import hmac, hashlib, urllib.parse
         query_string = urllib.parse.urlencode(params)
         signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
         full_url = f"{url}?{query_string}&signature={signature}"
 
         response = requests.post(full_url, headers=headers)
-        assets = response.json()
+        data = response.json()
 
-        notify(f"📦 Binance Response: {assets}")
+        assets = data if isinstance(data, list) else data.get('data') or data.get('assets')
 
         if not isinstance(assets, list):
-            notify("⚠️ Transfer Error: Expected a list of assets.")
+            notify("⚠️ Transfer Error: Unexpected data format from Binance.")
             time.sleep(600)
-            return
+            return False
 
+        transferred = False
         for asset in assets:
             name = asset['asset']
             balance = float(asset['free'])
-            if balance > 0:
-                # Prepare transfer query with all parameters
+            if balance >= 0.0001:  # Minimum meaningful transfer
+                transfer_url = "https://api.binance.com/sapi/v1/asset/transfer"
                 transfer_params = {
-                    'type': 1,
+                    'type': 1,  # Funding to Spot
                     'asset': name,
                     'amount': balance,
                     'timestamp': int(time.time() * 1000)
                 }
                 transfer_query = urllib.parse.urlencode(transfer_params)
                 transfer_signature = hmac.new(API_SECRET.encode(), transfer_query.encode(), hashlib.sha256).hexdigest()
-                transfer_url = f"https://api.binance.com/sapi/v1/asset/transfer?{transfer_query}&signature={transfer_signature}"
+                transfer_full_url = f"{transfer_url}?{transfer_query}&signature={transfer_signature}"
 
-                transfer_response = requests.post(transfer_url, headers=headers)
-
+                transfer_response = requests.post(transfer_full_url, headers=headers)
                 if transfer_response.status_code == 200:
                     notify(f"✅ Transferred {balance} {name} from Funding to Spot")
+                    transferred = True
                 else:
                     notify(f"❌ Transfer Failed: {transfer_response.text}")
-        time.sleep(5)
+                time.sleep(2)
+
+        if not transferred:
+            notify("⚠️ Hakuna coin yenye balance ya kutosha kuhamishwa Spot Wallet.")
+
+        return transferred
 
     except Exception as e:
         notify(f"⚠️ Transfer Error: {e}")
         time.sleep(600)
+        return False
         
 def sell_other_assets():
     try:
@@ -142,11 +149,18 @@ def buy_cheap_coins():
 while True:
     try:
         notify("🤖 Bot Started Cycle...")
-        transfer_funding_to_spot()
-        sell_other_assets()
-        buy_cheap_coins()
-        notify("✅ Cycle Completed. Waiting for next...")
+
+        moved = transfer_funding_to_spot()
+
+        if moved:
+            sell_other_assets()
+            buy_cheap_coins()
+            notify("✅ Cycle Completed. Waiting for next...")
+        else:
+            notify("⏳ No assets moved. Waiting before next cycle...")
+
     except Exception as error:
         notify(f"❌ Unexpected Error: {error}")
         time.sleep(ERROR_DELAY)
+
     time.sleep(TRADE_DELAY)
