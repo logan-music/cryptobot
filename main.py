@@ -3,9 +3,7 @@ import requests
 from binance.client import Client
 from binance.enums import *
 from binance.exceptions import BinanceAPIException
-import hmac
-import hashlib
-import urllib.parse
+import hmac, hashlib, urllib.parse
 
 # ==== API Keys (Wazi) ====
 API_KEY = "iqHagbaiABKRNapKslzKZZHKq8ooYjTpOfypXnK0YQBFy2qXDMjd2HQ59m5RJNQa"
@@ -16,15 +14,15 @@ BOT_TOKEN = "7501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
 CHAT_ID = "6978133426"
 
 # ==== Settings ====
-TRADE_DELAY = 20      # sekunde kati ya trades
-ERROR_DELAY = 300     # sekunde 300 = dakika 5
-MIN_TRADE_USD = 0.001
+TRADE_DELAY = 20         # sekunde kati ya trades
+ERROR_DELAY = 300        # sekunde 300 = dakika 5
+MIN_TRADE_USD = 0.001    # kiwango cha chini kuuza coin yoyote
 
 # ==== Coins za kununua automatically ====
 CHEAP_COINS = [
     'BANANAUSDT', 'SHIBUSDT', 'PEPEUSDT', 'FLOKIUSDT',
     'BONKUSDT', 'LUNCUSDT', 'SPELLUSDT', 'DENTUSDT',
-    'SCUSDT', 'LEVERUSDT', 'SOLVUSDT', 'STOUSDT', 'TONUSDT'
+    'SCUSDT', 'LEVEUSDT', 'SOLVUSDT', 'STOUSDT', 'TONUSDT'
 ]
 
 # ==== Start Binance client ====
@@ -40,15 +38,23 @@ def notify(msg):
 
 def transfer_funding_to_spot():
     try:
+        # Step 1: Get list of funding assets
         url = "https://api.binance.com/sapi/v1/asset/get-funding-asset"
-        headers = {'X-MBX-APIKEY': API_KEY}
-        params = {'timestamp': int(time.time() * 1000)}
+        headers = {
+            'X-MBX-APIKEY': API_KEY
+        }
+        params = {
+            'timestamp': int(time.time() * 1000)
+        }
+
+        import hmac, hashlib, urllib.parse
         query_string = urllib.parse.urlencode(params)
         signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
         full_url = f"{url}?{query_string}&signature={signature}"
 
         response = requests.post(full_url, headers=headers)
         assets = response.json()
+
         notify(f"📦 Binance Response: {assets}")
 
         if not isinstance(assets, list):
@@ -59,23 +65,26 @@ def transfer_funding_to_spot():
         for asset in assets:
             name = asset['asset']
             balance = float(asset['free'])
-            if balance >= 0.0001:  # Ignore tiny balances
+            if balance > 0:
+                # Prepare transfer query with all parameters
                 transfer_params = {
                     'type': 1,
                     'asset': name,
-                    'amount': f"{balance:.8f}",
+                    'amount': balance,
                     'timestamp': int(time.time() * 1000)
                 }
                 transfer_query = urllib.parse.urlencode(transfer_params)
-                signature = hmac.new(API_SECRET.encode(), transfer_query.encode(), hashlib.sha256).hexdigest()
-                transfer_url = f"https://api.binance.com/sapi/v1/asset/transfer?{transfer_query}&signature={signature}"
+                transfer_signature = hmac.new(API_SECRET.encode(), transfer_query.encode(), hashlib.sha256).hexdigest()
+                transfer_url = f"https://api.binance.com/sapi/v1/asset/transfer?{transfer_query}&signature={transfer_signature}"
 
-                result = requests.post(transfer_url, headers=headers)
-                if result.status_code == 200:
+                transfer_response = requests.post(transfer_url, headers=headers)
+
+                if transfer_response.status_code == 200:
                     notify(f"✅ Transferred {balance} {name} from Funding to Spot")
                 else:
-                    notify(f"❌ Transfer Failed: {result.text}")
+                    notify(f"❌ Transfer Failed: {transfer_response.text}")
         time.sleep(5)
+
     except Exception as e:
         notify(f"⚠️ Transfer Error: {e}")
         time.sleep(600)
@@ -94,8 +103,8 @@ def sell_other_assets():
                     if value >= MIN_TRADE_USD:
                         info = client.get_symbol_info(symbol)
                         step_size = float([f for f in info['filters'] if f['filterType'] == 'LOT_SIZE'][0]['stepSize'])
-                        precision = int(round(-1 * (step_size).as_integer_ratio()[1].bit_length() / 3.32193))  # log2(10)=3.32193
-                        qty = round(free - (free % step_size), precision)
+                        qty = free - (free % step_size)
+                        qty = round(qty, 6)
                         if qty > 0:
                             client.order_market_sell(symbol=symbol, quantity=qty)
                             notify(f"✅ Sold {qty} {asset} (~${value:.5f})")
