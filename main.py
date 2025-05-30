@@ -131,14 +131,16 @@ def buy_cheap_coins():
 # ==== Main Bot Loop ====
 while True:
     try:
+        notify("🤖 Bot Started Cycle...")
+
         moved = transfer_funding_to_spot()
 
         if moved:
-            notify("🤖 Bot Started Cycle...")
             sell_other_assets()
             buy_cheap_coins()
             notify("✅ Cycle Completed. Waiting for next...")
-        # Else: stay silent
+        else:
+            notify("⏳ No assets moved. Waiting before next cycle...")
 
     except Exception as error:
         notify(f"❌ Unexpected Error: {error}")
