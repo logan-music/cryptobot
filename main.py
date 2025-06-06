@@ -1,149 +1,72 @@
 import time
-import requests
 from binance.client import Client
-from binance.enums import *
-import hmac, hashlib, urllib.parse
+import requests
 
-# ==== API Keys (Wazi) ====
+# ==== API Keys zako =====
 API_KEY = "iqHagbaiABKRNapKslzKZZHKq8ooYjTpOfypXnK0YQBFy2qXDMjd2HQ59m5RJNQa"
 API_SECRET = "4SJOu1aRnTa1w8qZOb5MAw1PrJEpLsaeREvbJeE7O3ESOrDAX97a7g1SfDiaLm7F"
 
-# ==== Telegram Notification ====
+# ==== Telegram Alert Info ====
 BOT_TOKEN = "7501645118:AAHuL5xMbPY3WZXJVnidijR9gqoyyCS0BzY"
 CHAT_ID = "6978133426"
 
-# ==== Settings ====
-TRADE_DELAY = 20         # sekunde kati ya trades
-ERROR_DELAY = 300        # sekunde 300 = dakika 5
-MIN_TRADE_USD = 0.001    # kiwango cha chini kuuza coin yoyote
-
-# ==== Coins za kununua automatically ====
-CHEAP_COINS = [
-    'BANANAUSDT', 'SHIBUSDT', 'PEPEUSDT', 'FLOKIUSDT',
-    'BONKUSDT', 'LUNCUSDT', 'SPELLUSDT', 'DENTUSDT',
-    'SCUSDT', 'LEVERUSDT', 'SOLVUSDT', 'STOUSDT', 'TONUSDT'
-]
-
-# ==== Start Binance client ====
 client = Client(API_KEY, API_SECRET)
 
+TRADE_DELAY = 30  # seconds between checks
+MIN_TRADE_USD = 0.05
+PROFIT_TARGET = 1.05  # 5% profit target
+
 def notify(msg):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    data = {"chat_id": CHAT_ID, "text": msg}
     try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        payload = {"chat_id": CHAT_ID, "text": msg}
-        requests.post(url, data=payload)
-    except Exception as e:
-        print("Telegram Error:", e)
+        requests.post(url, data=data)
+    except:
+        pass
 
-def transfer_funding_to_spot():
-    try:
-        url = "https://api.binance.com/sapi/v1/asset/get-funding-asset"
-        headers = {'X-MBX-APIKEY': API_KEY}
-        params = {'timestamp': int(time.time() * 1000)}
+def get_price(symbol):
+    return float(client.get_symbol_ticker(symbol=symbol)['price'])
 
-        # Sign the request
-        query_string = urllib.parse.urlencode(params)
-        signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
-        full_url = f"{url}?{query_string}&signature={signature}"
+def get_balance(asset):
+    b = client.get_asset_balance(asset=asset)
+    return float(b['free']) if b else 0
 
-        response = requests.post(full_url, headers=headers)
-        data = response.json()
+def get_step(symbol):
+    info = client.get_symbol_info(symbol)
+    return float([f for f in info['filters'] if f['filterType'] == 'LOT_SIZE'][0]['stepSize'])
 
-        assets = data if isinstance(data, list) else data.get('data') or data.get('assets')
-        if not isinstance(assets, list):
-            return False  # kimya
+def round_qty(qty, step):
+    precision = len(str(step).split('.')[-1])
+    return round(qty - (qty % step), precision)
 
-        transferred = False
-        for asset in assets:
-            name = asset['asset']
-            balance = float(asset['free'])
-            if balance >= 0.0001:  # Minimum meaningful transfer
-                transfer_url = "https://api.binance.com/sapi/v1/asset/transfer"
-                transfer_params = {
-                    'type': 1,
-                    'asset': name,
-                    'amount': balance,
-                    'timestamp': int(time.time() * 1000)
-                }
-                transfer_query = urllib.parse.urlencode(transfer_params)
-                transfer_signature = hmac.new(API_SECRET.encode(), transfer_query.encode(), hashlib.sha256).hexdigest()
-                transfer_full_url = f"{transfer_url}?{transfer_query}&signature={transfer_signature}"
+def trade_symbol(symbol, asset, buy_price_holder):
+    usdt = get_balance('USDT')
+    price = get_price(symbol)
+    step = get_step(symbol)
+    coin_balance = get_balance(asset)
 
-                transfer_response = requests.post(transfer_full_url, headers=headers)
-                if transfer_response.status_code == 200:
-                    notify(f"✅ Transferred {balance} {name} from Funding to Spot")
-                    transferred = True
-                time.sleep(2)
-
-        return transferred
-
-    except Exception:
-        return False  # kimya
-
-def sell_other_assets():
-    try:
-        account = client.get_account()
-        for balance in account['balances']:
-            asset = balance['asset']
-            free = float(balance['free'])
-            if free > 0 and asset != 'USDT':
-                symbol = asset + 'USDT'
-                try:
-                    price = float(client.get_symbol_ticker(symbol=symbol)['price'])
-                    value = price * free
-                    if value >= MIN_TRADE_USD:
-                        info = client.get_symbol_info(symbol)
-                        step_size = float([f for f in info['filters'] if f['filterType'] == 'LOT_SIZE'][0]['stepSize'])
-                        qty = free - (free % step_size)
-                        qty = round(qty, 6)
-                        if qty > 0:
-                            client.order_market_sell(symbol=symbol, quantity=qty)
-                            notify(f"✅ Sold {qty} {asset} (~${value:.5f})")
-                            time.sleep(TRADE_DELAY)
-                except Exception as e:
-                    notify(f"❌ Sell Error on {symbol}: {e}")
-                    time.sleep(ERROR_DELAY)
-    except Exception as e:
-        notify(f"❌ Sell Process Error: {e}")
-        time.sleep(ERROR_DELAY)
-
-def buy_cheap_coins():
-    try:
-        usdt = float(client.get_asset_balance(asset='USDT')['free'])
-        if usdt < MIN_TRADE_USD:
-            return  # kimya
-        portion = usdt / len(CHEAP_COINS)
-        for symbol in CHEAP_COINS:
-            try:
-                price = float(client.get_symbol_ticker(symbol=symbol)['price'])
-                qty = round(portion / price, 0)
-                if qty > 0:
-                    client.order_market_buy(symbol=symbol, quantity=qty)
-                    notify(f"✅ Bought {qty} of {symbol}")
-                    time.sleep(TRADE_DELAY)
-            except Exception as e:
-                notify(f"❌ Buy Error on {symbol}: {e}")
-                time.sleep(ERROR_DELAY)
-    except Exception as e:
-        notify(f"❌ Buy Process Error: {e}")
-        time.sleep(ERROR_DELAY)
+    if coin_balance == 0 and usdt >= MIN_TRADE_USD:
+        qty = round_qty(usdt / price, step)
+        if qty > 0:
+            client.order_market_buy(symbol=symbol, quantity=qty)
+            buy_price_holder[asset] = price
+            notify(f"✅ Bought {qty} {asset} at ${price}")
+    elif coin_balance > 0:
+        buy_price = buy_price_holder.get(asset)
+        if buy_price and price >= buy_price * PROFIT_TARGET:
+            qty = round_qty(coin_balance, step)
+            if qty > 0:
+                client.order_market_sell(symbol=symbol, quantity=qty)
+                notify(f"✅ Sold {qty} {asset} at ${price} (Profit!)")
+                buy_price_holder.pop(asset, None)
 
 # ==== Main Bot Loop ====
+buy_prices = {}
+
 while True:
     try:
-        notify("🤖 Bot Started Cycle...")
-
-        moved = transfer_funding_to_spot()
-
-        if moved:
-            sell_other_assets()
-            buy_cheap_coins()
-            notify("✅ Cycle Completed. Waiting for next...")
-        else:
-            notify("⏳ No assets moved. Waiting before next cycle...")
-
-    except Exception as error:
-        notify(f"❌ Unexpected Error: {error}")
-        time.sleep(ERROR_DELAY)
-
+        trade_symbol("SHIBUSDT", "SHIB", buy_prices)
+        trade_symbol("BANANAUSDT", "BANANA", buy_prices)
+    except Exception as e:
+        notify(f"❌ Error: {e}")
     time.sleep(TRADE_DELAY)
