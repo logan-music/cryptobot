@@ -60,13 +60,16 @@ def trade_symbol(symbol, asset, buy_price_holder):
                 notify(f"✅ Sold {qty} {asset} at ${price} (Profit!)")
                 buy_price_holder.pop(asset, None)
 
+# ==== Start Message ====
+notify("🤖 Bot Started and is now running...")
+
 # ==== Main Bot Loop ====
 buy_prices = {}
 
 while True:
     try:
         trade_symbol("SHIBUSDT", "SHIB", buy_prices)
-        trade_symbol("BANANAUSDT", "BANANA", buy_prices)
+        trade_symbol("BANANAUSDT", "BANANAS31", buy_prices)
     except Exception as e:
         notify(f"❌ Error: {e}")
     time.sleep(TRADE_DELAY)
