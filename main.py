@@ -69,7 +69,7 @@ buy_prices = {}
 while True:
     try:
         trade_symbol("SHIBUSDT", "SHIB", buy_prices)
-        trade_symbol("BANANAUSDT", "BANANAS31", buy_prices)
+        trade_symbol("PEPEUSDT", "PEPE", buy_prices)
     except Exception as e:
         notify(f"❌ Error: {e}")
     time.sleep(TRADE_DELAY)
